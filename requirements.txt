@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+python-dotenv
+pydantic
+requests
+
+cohere
+pinecone-client
+rank-bm25
+
+python-docx
+PyPDF2
+pytesseract
+Pillow
+
+spacy
