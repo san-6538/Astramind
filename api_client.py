@@ -1,3 +1,4 @@
+#frontend file
 import requests
 
 BASE_URL = "http://127.0.0.1:8000"  # backend server
@@ -38,3 +39,4 @@ def chat_query(prompt, session_id="default", alpha=0.5, top_k=5):
             return {"answer": f"❌ Server Error {response.status_code}: {response.text}"}
     except Exception as e:
         return {"answer": f"⚠️ Backend not reachable: {e}"}
+
