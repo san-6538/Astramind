@@ -1,3 +1,4 @@
+#frontend file
 import streamlit as st
 from api_client import upload_file, chat_query
 from PIL import Image
@@ -101,3 +102,4 @@ st.markdown(
     "<p style='text-align:center; color:gray;'>Built with ❤️ by <b>Sachin</b></p>",
     unsafe_allow_html=True,
 )
+
