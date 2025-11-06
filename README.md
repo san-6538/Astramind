@@ -31,7 +31,7 @@ It integrates **document understanding**, **semantic search**, and **language mo
              ├────────────────────────┤
              │  Document Processing   │
              │  Chunking + Embedding  │
-             │  Vector Search (FAISS) │
+             │ VectorSearch(Pinecone) │
              │  LLM Response Generator│
              └────────────────────────┘
 
@@ -84,8 +84,8 @@ Who developed AstraMind?	AstraMind was developed as part of an advanced AI-based
 | ---------------------- | --------------------- | -------------------------------------- | ----------------------------------- |
 | **Backend Framework**  | FastAPI               | Asynchronous, easy to scale            | Separate from UI process            |
 | **Frontend Framework** | Streamlit             | Rapid prototyping, minimal boilerplate | Not ideal for multi-user production |
-| **Vector Store**       | FAISS                 | Fast local similarity search           | Limited horizontal scalability      |
-| **LLM Integration**    | OpenAI / Gemini APIs  | High-quality reasoning                 | API dependency and cost             |
+| **Vector Store**       | Pinecone               | Fast local similarity search           | Limited horizontal scalability      |
+| **LLM Integration**    | Gemini APIs           | High-quality reasoning                 | API dependency and cost             |
 | **Embedding Strategy** | Sentence-transformers | Efficient and reliable embeddings      | Needs GPU for high-speed inference  |
 
 
