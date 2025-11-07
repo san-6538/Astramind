@@ -37,6 +37,7 @@ Gemini Vision fallback
 🧠 Auto-summarization of long chat sessions
 
 🏗️ System Architecture
+```bash
                ┌──────────────────────────────┐
              │        Streamlit UI          │
              │       (frontend/app.py)      │
@@ -66,10 +67,11 @@ Gemini Vision fallback
  │    - Caching answers, embeddings, and sessions      │
  └────────────────────────────────────────────────────┘
 
-
+```
 ---
 
 ## 🧠 Retrieval Approach  
+```bash
 
 | Technique | Component | Description |
 |------------|------------|--------------|
@@ -78,20 +80,20 @@ Gemini Vision fallback
 | **Hybrid Retrieval** | Fusion of BM25 + Dense Scores | Weighted combination (α) of both methods. Dynamically tuned by query type. |
 | **Semantic Reranking** | Gemini LLM | Uses Gemini to re-rank top candidates by relevance and coherence. |
 | **Caching & Memory** | Redis | Stores embeddings, question-answer pairs, and conversation history. |
-
+```
 ---
 
 ## 🔍 OCR Strategy  
 
 AstraMind uses a **multi-stage OCR pipeline** to ensure maximum text extraction accuracy:
-
+```bash
 | Stage | Engine | Use Case |
 |--------|--------|----------|
 | 1️⃣ | Google Cloud Vision API | High-accuracy text detection for structured or tabular images |
 | 2️⃣ | Tesseract OCR | Fast classical OCR for clean scans |
 | 3️⃣ | EasyOCR | Handles handwriting or noisy documents |
 | 4️⃣ | Gemini Vision Model | Fallback OCR for complex documents (AI-based vision understanding) |
-
+```
 ---
 
 ## ⚙️ Setup Instructions  
@@ -136,7 +138,7 @@ streamlit run app.py
 
 
 App runs at → http://localhost:8501
-
+```
 🧪 Example Workflow
 
 Upload documents (PDF, DOCX, or images)
@@ -148,6 +150,9 @@ Ask a question — it runs hybrid retrieval
 Gemini-Pro generates a grounded, factual answer
 
 Conversation history is cached for context continuity
+
+--------
+```bash
 
 💬 Sample Queries
 | Query                                                    | Expected Output                                        |
@@ -178,8 +183,9 @@ Design decisions and trade off
 | **Cache**     | Redis                   | Fast retrieval + memory persistence | Needs running Redis server |
 | **Frontend**  | Streamlit               | Easy UX prototyping                 | Limited multi-user scaling |
 
-
+```
 Requirements.txt
+```bash
 fastapi
 uvicorn
 streamlit
@@ -201,10 +207,10 @@ python-dotenv
 pdf2image
 fitz
 docx2txt
-
+```
 
 🚫 .gitignore
-
+```bash
 # Python
 __pycache__/
 *.py[cod]
@@ -231,7 +237,7 @@ uploads/
 *.jpg
 *.jpeg
 
-
+```
 🔗 API Endpoints
 Method	Endpoint	Description
 POST	/upload_pdf	Upload a PDF
