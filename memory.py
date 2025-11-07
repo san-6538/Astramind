@@ -4,92 +4,118 @@ import os
 from datetime import datetime
 from dotenv import load_dotenv
 
-# ✅ Load environment variables
+# -------------------------------------------------------------
+# ✅ Load Config
+# -------------------------------------------------------------
 load_dotenv()
 
-# ✅ Initialize Redis client (DB 1 for chat memory)
-redis_client = redis.Redis(
-    host=os.getenv("REDIS_HOST", "localhost"),
-    port=int(os.getenv("REDIS_PORT", "6379")),
-    db=1,
-    decode_responses=True  # ensures data is returned as str, not bytes
-)
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_DB = 1  # dedicated DB for chat memory
+CHAT_TTL = 3600 * 3  # 3 hours default
 
-# 🧠 Chat memory will persist for 3 hours (extendable)
-CHAT_TTL = 3600 * 3  # 3 hours
+# -------------------------------------------------------------
+# ✅ Initialize Redis Client for Memory
+# -------------------------------------------------------------
+try:
+    redis_client = redis.Redis(
+        host=REDIS_HOST,
+        port=REDIS_PORT,
+        db=REDIS_DB,
+        decode_responses=True,
+        socket_timeout=3,
+        socket_connect_timeout=3,
+    )
+    redis_client.ping()
+    print(f"✅ Connected to Redis (chat memory) at {REDIS_HOST}:{REDIS_PORT} [DB {REDIS_DB}]")
+except redis.exceptions.ConnectionError:
+    print("⚠️ Redis chat memory DB not reachable. Conversation memory disabled.")
+    redis_client = None
 
 
 # -------------------------------------------------------------
-# ✅ Utility Functions
+# ✅ Utility
 # -------------------------------------------------------------
 def _key(session_id: str) -> str:
-    """Return Redis key for chat memory."""
-    return f"chat:{session_id}"
+    """Generate a namespaced Redis key for chat memory."""
+    return f"astramind:chat:{session_id}"
 
 
+# -------------------------------------------------------------
+# ✅ Core Memory Functions
+# -------------------------------------------------------------
 def get_memory(session_id: str):
-    """Retrieve the stored conversation for a session."""
-    try:
-        key = _key(session_id)
-        history_json = redis_client.get(key)
-        if history_json:
-            return json.loads(history_json)
+    """Retrieve conversation memory for a session."""
+    if not redis_client:
         return []
+    try:
+        data = redis_client.get(_key(session_id))
+        if not data:
+            return []
+        return json.loads(data)
     except Exception as e:
-        print(f"⚠️ Redis read error: {e}")
+        print(f"⚠️ Redis memory read error: {e}")
         return []
 
 
 def add_to_memory(session_id: str, role: str, content: str):
-    """Add a new message to session memory."""
+    """Add a user or assistant message to memory."""
+    if not redis_client:
+        return
     try:
-        key = _key(session_id)
         record = {
             "role": role,
             "content": content,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
-        # Load current history
         history = get_memory(session_id)
         history.append(record)
 
-        # Save updated history with TTL refresh
-        redis_client.setex(key, CHAT_TTL, json.dumps(history))
-
+        redis_client.setex(_key(session_id), CHAT_TTL, json.dumps(history))
+        print(f"💬 Memory updated for session '{session_id}' ({len(history)} turns).")
     except Exception as e:
-        print(f"❌ Redis write error: {e}")
+        print(f"❌ Redis memory write error: {e}")
 
 
 def clear_memory(session_id: str):
-    """Completely remove session memory."""
+    """Remove memory for a specific chat session."""
+    if not redis_client:
+        return
     try:
         redis_client.delete(_key(session_id))
-        print(f"🧹 Memory cleared for session: {session_id}")
+        print(f"🧹 Cleared chat memory for session: {session_id}")
     except Exception as e:
-        print(f"⚠️ Failed to clear memory for {session_id}: {e}")
+        print(f"⚠️ Failed to clear chat memory: {e}")
 
 
+# -------------------------------------------------------------
+# ✅ Auto-Summarization Support
+# -------------------------------------------------------------
 def summarize_if_needed(session_id: str, summarize_func, threshold: int = 10):
     """
-    Summarize chat history if it exceeds a threshold.
-    Uses the provided LLM summarization function (e.g. generate_answer).
+    Summarize long chat histories automatically.
+    summarize_func: callable → LLM summarization function
+    threshold: number of turns before summarizing
     """
+    if not redis_client:
+        return None
     try:
         history = get_memory(session_id)
         if len(history) > threshold:
-            print(f"🧠 Auto-summarizing memory for session: {session_id}")
+            print(f"🧠 Auto-summarizing session '{session_id}' ({len(history)} messages)...")
+
             text_to_summarize = "\n".join(
-                [f"{m['role']}: {m['content']}" for m in history[-threshold:]]
+                [f"{m['role'].upper()}: {m['content']}" for m in history[-threshold:]]
             )
             summary = summarize_func([text_to_summarize], "Summarize conversation")
 
-            # Reset memory and store the summary
+            # Reset and store the summary
             clear_memory(session_id)
             add_to_memory(session_id, "system", f"Summary: {summary}")
 
             return summary
         return None
     except Exception as e:
-        print(f"⚠️ Summarization failed: {e}")
+        print(f"⚠️ Auto-summarization failed: {e}")
         return None
