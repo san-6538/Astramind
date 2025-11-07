@@ -37,61 +37,75 @@ Gemini Vision fallback
 🧠 Auto-summarization of long chat sessions
 
 🏗️ System Architecture
-                 ┌──────────────────────────────┐
-                 │        Streamlit UI          │
-                 │ (frontend/app.py)            │
-                 │ ─ Uploads files              │
-                 │ ─ Displays chat responses    │
-                 └──────────────┬───────────────┘
-                                │
-                         REST API Calls
-                                │
-     ┌──────────────────────────▼──────────────────────────┐
-     │                  FastAPI Backend                    │
-     │                 (backend/main.py)                   │
-     ├────────────────────────────────────────────────────┤
-     │  🧩 Preprocessing + OCR Pipeline                    │
-     │    - PDF / DOCX / Image text extraction             │
-     │    - Google Vision / EasyOCR / Tesseract fallback   │
-     │                                                     │
-     │  🧮 Hybrid Retrieval Engine                         │
-     │    - Dense (Pinecone vector DB)                     │
-     │    - Sparse (BM25 lexical search)                   │
-     │    - Gemini semantic reranking                      │
-     │                                                     │
-     │  🧠 LLM Layer (Gemini-Pro / Gemini-1.5 Flash)       │
-     │    - Context reasoning + generation                 │
-     │                                                     │
-     │  ⚙️ Redis Cache + Memory                            │
-     │    - Caching answers, embeddings, and sessions      │
-     └────────────────────────────────────────────────────┘
+               ┌──────────────────────────────┐
+             │        Streamlit UI          │
+             │       (frontend/app.py)      │
+             │ ─ Uploads files              │
+             │ ─ Displays chat responses    │
+             └──────────────┬───────────────┘
+                            │
+                     REST API Calls
+                            │
+ ┌──────────────────────────▼──────────────────────────┐
+ │                  FastAPI Backend                    │
+ │                 (backend/main.py)                   │
+ ├────────────────────────────────────────────────────┤
+ │  🧩 Preprocessing + OCR Pipeline                    │
+ │    - PDF / DOCX / Image text extraction             │
+ │    - Google Vision / EasyOCR / Tesseract fallback   │
+ │                                                     │
+ │  🧮 Hybrid Retrieval Engine                         │
+ │    - Dense (Pinecone vector DB)                     │
+ │    - Sparse (BM25 lexical search)                   │
+ │    - Gemini semantic reranking                      │
+ │                                                     │
+ │  🧠 LLM Layer (Gemini-Pro / Gemini-1.5 Flash)       │
+ │    - Context reasoning + generation                 │
+ │                                                     │
+ │  ⚙️ Redis Cache + Memory                            │
+ │    - Caching answers, embeddings, and sessions      │
+ └────────────────────────────────────────────────────┘
 
-🧠 Retrieval Approach
-Technique	Component	Description
-Dense Retrieval	Pinecone + Gemini Text Embedding	Converts text chunks into vector embeddings (semantic meaning). Enables semantic similarity search.
-Sparse Retrieval	BM25 (keyword-based)	Classic IR method for exact term matching. Strong for factual and short queries.
-Hybrid Retrieval	Fusion of BM25 + Dense Scores	Weighted combination (α) of both methods. Dynamically tuned by query type.
-Semantic Reranking	Gemini LLM	Uses Gemini to re-rank top candidates by relevance and coherence.
-Caching & Memory	Redis	Stores embeddings, question-answer pairs, and conversation history.
-🔍 OCR Strategy
 
-AstraMind uses a multi-stage OCR pipeline to ensure maximum text extraction accuracy:
+---
 
-Stage	Engine	Use Case
-1️⃣	Google Cloud Vision API	High-accuracy text detection for structured or tabular images
-2️⃣	Tesseract OCR	Fast classical OCR for clean scans
-3️⃣	EasyOCR	Handles handwriting or noisy documents
-4️⃣	Gemini Vision Model	Fallback OCR for complex documents (AI-based vision understanding)
-⚙️ Setup Instructions
-1️⃣ Clone Repository
+## 🧠 Retrieval Approach  
+
+| Technique | Component | Description |
+|------------|------------|--------------|
+| **Dense Retrieval** | Pinecone + Gemini Text Embedding | Converts text chunks into vector embeddings (semantic meaning). Enables semantic similarity search. |
+| **Sparse Retrieval** | BM25 (keyword-based) | Classic IR method for exact term matching. Strong for factual and short queries. |
+| **Hybrid Retrieval** | Fusion of BM25 + Dense Scores | Weighted combination (α) of both methods. Dynamically tuned by query type. |
+| **Semantic Reranking** | Gemini LLM | Uses Gemini to re-rank top candidates by relevance and coherence. |
+| **Caching & Memory** | Redis | Stores embeddings, question-answer pairs, and conversation history. |
+
+---
+
+## 🔍 OCR Strategy  
+
+AstraMind uses a **multi-stage OCR pipeline** to ensure maximum text extraction accuracy:
+
+| Stage | Engine | Use Case |
+|--------|--------|----------|
+| 1️⃣ | Google Cloud Vision API | High-accuracy text detection for structured or tabular images |
+| 2️⃣ | Tesseract OCR | Fast classical OCR for clean scans |
+| 3️⃣ | EasyOCR | Handles handwriting or noisy documents |
+| 4️⃣ | Gemini Vision Model | Fallback OCR for complex documents (AI-based vision understanding) |
+
+---
+
+## ⚙️ Setup Instructions  
+
+### 1️⃣ Clone Repository
+```bash
 git clone https://github.com/<your-username>/AstraMind.git
 cd AstraMind
 
 2️⃣ Create a Virtual Environment
 python -m venv venv
 # Activate
-venv\Scripts\activate    # Windows
-source venv/bin/activate # Mac/Linux
+venv\Scripts\activate        # Windows
+source venv/bin/activate     # Mac/Linux
 
 3️⃣ Install Dependencies
 pip install -r requirements.txt
@@ -136,29 +150,36 @@ Gemini-Pro generates a grounded, factual answer
 Conversation history is cached for context continuity
 
 💬 Sample Queries
-Query	Expected Output
-“Summarize the uploaded research paper.”	Extracts and summarizes all key sections from the PDF.
-“List all formulas from the uploaded engineering notes.”	Identifies and lists mathematical expressions.
-“What is the main takeaway from the report?”	LLM generates context-grounded answer.
-🧠 Models & Components
-Component	Model / Library	Purpose
-LLM	Gemini-Pro / Gemini 1.5 Flash	Reasoning + generation
-Embedding	text-embedding-004	High-dimensional semantic embeddings
-Vector DB	Pinecone	Fast approximate nearest-neighbor search
-OCR	Google Vision API, Tesseract, EasyOCR, Gemini Vision	Robust text extraction
-Cache & Memory	Redis	Contextual memory and response caching
-Sparse Retrieval	BM25 (Rank-BM25)	Lexical retrieval engine
-Web Framework	FastAPI	Async backend API
-Frontend	Streamlit	Interactive user interface
-🧱 Design Decisions & Trade-offs
-Aspect	Design Choice	Rationale	Trade-off
-Retrieval	Hybrid (Dense + Sparse)	Combines recall and precision	Slightly higher compute
-OCR	Multi-engine fallback	Ensures 99% extraction accuracy	Slower for large batches
-Vector DB	Pinecone	Scalable & low-latency	External dependency
-LLM	Gemini-Pro	Strong reasoning + low latency	Requires API quota
-Cache	Redis	Fast retrieval + memory persistence	Needs running Redis server
-Frontend	Streamlit	Easy UX prototyping	Limited multi-user scaling
-🧩 requirements.txt
+| Query                                                    | Expected Output                                        |
+| -------------------------------------------------------- | ------------------------------------------------------ |
+| “Summarize the uploaded research paper.”                 | Extracts and summarizes all key sections from the PDF. |
+| “List all formulas from the uploaded engineering notes.” | Identifies and lists mathematical expressions.         |
+| “What is the main takeaway from the report?”             | LLM generates context-grounded answer.                 |
+
+ Models & Component
+| Component            | Model / Library                                      | Purpose                                  |
+| -------------------- | ---------------------------------------------------- | ---------------------------------------- |
+| **LLM**              | Gemini-Pro / Gemini 1.5 Flash                        | Reasoning + generation                   |
+| **Embedding**        | text-embedding-004                                   | High-dimensional semantic embeddings     |
+| **Vector DB**        | Pinecone                                             | Fast approximate nearest-neighbor search |
+| **OCR**              | Google Vision API, Tesseract, EasyOCR, Gemini Vision | Robust text extraction                   |
+| **Cache & Memory**   | Redis                                                | Contextual memory and response caching   |
+| **Sparse Retrieval** | BM25 (Rank-BM25)                                     | Lexical retrieval engine                 |
+| **Web Framework**    | FastAPI                                              | Async backend API                        |
+| **Frontend**         | Streamlit                                            | Interactive user interface               |
+
+Design decisions and trade off
+| Aspect        | Design Choice           | Rationale                           | Trade-off                  |
+| ------------- | ----------------------- | ----------------------------------- | -------------------------- |
+| **Retrieval** | Hybrid (Dense + Sparse) | Combines recall and precision       | Slightly higher compute    |
+| **OCR**       | Multi-engine fallback   | Ensures 99% extraction accuracy     | Slower for large batches   |
+| **Vector DB** | Pinecone                | Scalable & low-latency              | External dependency        |
+| **LLM**       | Gemini-Pro              | Strong reasoning + low latency      | Requires API quota         |
+| **Cache**     | Redis                   | Fast retrieval + memory persistence | Needs running Redis server |
+| **Frontend**  | Streamlit               | Easy UX prototyping                 | Limited multi-user scaling |
+
+
+Requirements.txt
 fastapi
 uvicorn
 streamlit
@@ -181,7 +202,9 @@ pdf2image
 fitz
 docx2txt
 
+
 🚫 .gitignore
+
 # Python
 __pycache__/
 *.py[cod]
@@ -208,9 +231,6 @@ uploads/
 *.jpg
 *.jpeg
 
-# API Keys / Credentials
-*.json
-.env
 
 🔗 API Endpoints
 Method	Endpoint	Description
