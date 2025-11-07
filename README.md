@@ -71,7 +71,7 @@ Gemini Vision fallback
 ---
 
 ## 🧠 Retrieval Approach  
-```bash
+
 
 | Technique | Component | Description |
 |------------|------------|--------------|
@@ -80,20 +80,20 @@ Gemini Vision fallback
 | **Hybrid Retrieval** | Fusion of BM25 + Dense Scores | Weighted combination (α) of both methods. Dynamically tuned by query type. |
 | **Semantic Reranking** | Gemini LLM | Uses Gemini to re-rank top candidates by relevance and coherence. |
 | **Caching & Memory** | Redis | Stores embeddings, question-answer pairs, and conversation history. |
-```
+
 ---
 
 ## 🔍 OCR Strategy  
 
 AstraMind uses a **multi-stage OCR pipeline** to ensure maximum text extraction accuracy:
-```bash
+
 | Stage | Engine | Use Case |
 |--------|--------|----------|
 | 1️⃣ | Google Cloud Vision API | High-accuracy text detection for structured or tabular images |
 | 2️⃣ | Tesseract OCR | Fast classical OCR for clean scans |
 | 3️⃣ | EasyOCR | Handles handwriting or noisy documents |
 | 4️⃣ | Gemini Vision Model | Fallback OCR for complex documents (AI-based vision understanding) |
-```
+
 ---
 
 ## ⚙️ Setup Instructions  
