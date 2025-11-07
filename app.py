@@ -1,58 +1,67 @@
+import os
+from dotenv import load_dotenv
+
+# ✅ Load .env from the backend folder
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+load_dotenv(dotenv_path)
+
+print("🔑 GOOGLE_APPLICATION_CREDENTIALS =", os.getenv("GOOGLE_APPLICATION_CREDENTIALS"))
+
 import traceback
 from datetime import datetime
 from dotenv import load_dotenv
 import io
-import pytesseract
-import easyocr
 from fastapi import FastAPI, File, UploadFile, Query
 from fastapi.responses import JSONResponse
 from PIL import Image
 
-# Local Imports
+# --- Local Imports ---
 from services.vector_db import upsert_vectors, reset_namespace
 from services.bm25 import bm25
 from services.hybrid_search import hybrid_search
 from services.llm import generate_answer
 from services.cache import get_cached_answer, cache_answer
-from services.ocr import multi_stage_ocr
+from services.ocr import multi_stage_ocr, extract_text_from_image
 from services.filestore import save_upload
 from services.memory import add_to_memory, get_memory, clear_memory  # ✅ Conversational memory
 
 load_dotenv()
 
 # ✅ Initialize FastAPI app
-app = FastAPI(title="Hybrid RAG System", version="2.5.0")
-
-# ✅ Initialize EasyOCR and Tesseract
-easy_reader = easyocr.Reader(["en"], gpu=False)
-pytesseract.pytesseract.tesseract_cmd = r"C:\\Program Files\\Tesseract-OCR\\tesseract.exe"
+app = FastAPI(title="AstraMind Hybrid RAG System", version="3.0.0")
 
 
 @app.get("/")
 async def root():
-    return {"message": "✅ Hybrid RAG System Running with Batch OCR + Chat Memory"}
+    return {"message": "✅ AstraMind RAG System running with Vision OCR, Hybrid Search & Chat Memory"}
 
 
 # -------------------------------------------------------------
 # ✅ Shared Processing Function for One File
 # -------------------------------------------------------------
 def process_uploaded_file(path: str, file_type: str, filename: str):
+    """
+    Process one file (PDF, DOCX, or IMAGE) using unified multi-stage OCR,
+    then index content in BM25 + Pinecone.
+    """
     reset_namespace()
     bm25.reset()
 
     ocr_result = multi_stage_ocr(path, file_type=file_type)
     text = ocr_result.get("text", "").strip()
     tables = ocr_result.get("tables", [])
+    engine = ocr_result.get("engine", "Hybrid OCR")
 
     # Flatten tables into text
     table_chunks = []
     for table in tables:
-        if isinstance(table, str):  # markdown table text
+        if isinstance(table, str):
             table_chunks.append(table)
-        else:
-            rows = [" | ".join(cell.strip() for cell in row if cell) for row in table]
+        elif isinstance(table, list):
+            rows = [" | ".join(str(cell or "").strip() for cell in row) for row in table]
             table_chunks.append("\n".join(rows))
 
+    # Combine all chunks
     all_chunks = [chunk for chunk in (text.split("\n") + table_chunks) if chunk.strip()]
 
     if not all_chunks:
@@ -68,12 +77,13 @@ def process_uploaded_file(path: str, file_type: str, filename: str):
         chunks=all_chunks,
         namespace="default",
         source=filename,
-        meta_extra={"type": file_type, "engine": "Hybrid OCR", "page": None}
+        meta_extra={"type": file_type, "engine": engine, "page": None}
     )
 
     return {
         "filename": filename,
         "status": f"✅ {file_type.upper()} processed successfully",
+        "ocr_engine": engine,
         "chunks_indexed": len(all_chunks),
         "tables_detected": len(tables)
     }
@@ -108,42 +118,52 @@ async def upload_docx(file: UploadFile = File(...)):
 
 @app.post("/upload_image")
 async def upload_image(file: UploadFile = File(...)):
+    """
+    Upload an image and process it through Vision + fallback OCR,
+    then index chunks into Pinecone + BM25.
+    """
     try:
         image_bytes = await file.read()
         image = Image.open(io.BytesIO(image_bytes))
-        text_tess = pytesseract.image_to_string(image).strip()
-        if len(text_tess) < 10:
-            result_easy = easy_reader.readtext(image_bytes, detail=0)
-            text_tess = "\n".join(result_easy).strip()
-        if len(text_tess) < 10:
-            from services.ocr import extract_with_gemini_vision
-            text_tess = extract_with_gemini_vision(image)
-        if not text_tess.strip():
+
+        # ✅ Unified Vision OCR pipeline
+        text_extracted, engine_used = extract_text_from_image(image)
+
+        if not text_extracted.strip():
             return {"error": "No readable text found in image"}
 
-        chunks = [chunk.strip() for chunk in text_tess.split("\n") if chunk.strip()]
+        chunks = [chunk.strip() for chunk in text_extracted.split("\n") if chunk.strip()]
+
         reset_namespace()
         bm25.reset()
         bm25.add_documents(chunks)
-        upsert_vectors(chunks, namespace="default", source=file.filename,
-                       meta_extra={"type": "image", "engine": "Hybrid OCR"})
+        upsert_vectors(
+            chunks=chunks,
+            namespace="default",
+            source=file.filename,
+            meta_extra={"type": "image", "engine": engine_used}
+        )
 
         return {
-            "message": "✅ Image processed via OCR pipeline",
-            "engine_used": "Hybrid OCR",
+            "message": "✅ Image processed via Vision-based OCR pipeline",
+            "engine_used": engine_used,
             "chunks_indexed": len(chunks),
             "timestamp": datetime.now().isoformat()
         }
+
     except Exception as e:
         traceback.print_exc()
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
 # -------------------------------------------------------------
-# ✅ BATCH UPLOAD ENDPOINT
+# ✅ BATCH UPLOAD ENDPOINT (Multi-file Vision OCR)
 # -------------------------------------------------------------
 @app.post("/batch_upload")
 async def batch_upload(files: list[UploadFile] = File(...)):
+    """
+    Upload multiple files (PDF, DOCX, IMAGES) → unified Vision OCR pipeline.
+    """
     all_results = []
     total_chunks = 0
     total_tables = 0
@@ -167,7 +187,7 @@ async def batch_upload(files: list[UploadFile] = File(...)):
             all_results.append({"filename": file.filename, "error": str(e)})
 
     return {
-        "message": "✅ Batch upload and OCR complete",
+        "message": "✅ Batch upload completed using Vision OCR",
         "total_files": len(files),
         "total_chunks_indexed": total_chunks,
         "total_tables_detected": total_tables,
@@ -177,7 +197,7 @@ async def batch_upload(files: list[UploadFile] = File(...)):
 
 
 # -------------------------------------------------------------
-# ✅ HYBRID ASK (Single-turn)
+# ✅ HYBRID ASK (Single-turn Query)
 # -------------------------------------------------------------
 @app.get("/ask")
 async def ask(
@@ -243,7 +263,7 @@ async def chat(
         results = hybrid_search(question, alpha=alpha, top_k=top_k)
         context_texts = [r["text"] for r in results]
 
-        # ✅ FIXED safe multiline string
+        # Combine conversation + context
         combined_context = (
             "Previous conversation:\n"
             + past_context
@@ -255,11 +275,11 @@ async def chat(
         # Generate LLM answer
         answer = generate_answer([combined_context], question)
 
-        # Save chat memory
+        # Update memory
         add_to_memory(session_id, "user", question)
         add_to_memory(session_id, "assistant", answer)
 
-        # Optional summarization
+        # Auto-summarize memory after 10+ turns
         if len(history) > 10:
             summary_prompt = f"Summarize the key points of this conversation:\n{past_context}"
             summary = generate_answer([summary_prompt], "Summarize")
